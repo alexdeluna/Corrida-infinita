@@ -1,22 +1,71 @@
-const cacheName = "desvie-pro-v1"
+body{
+margin:0;
+text-align:center;
+background:#111;
+color:white;
+font-family:Arial;
+}
 
-const files = [
-"/",
-"/index.html",
-"/style.css",
-"/app.js"
-]
+canvas{
+background:#222;
+display:block;
+margin:auto;
+border-radius:10px;
+}
 
-self.addEventListener("install", e=>{
-e.waitUntil(
-caches.open(cacheName)
-.then(cache=>cache.addAll(files))
-)
-})
+button{
+margin:5px;
+padding:10px 20px;
+font-size:18px;
+}
 
-self.addEventListener("fetch", e=>{
-e.respondWith(
-caches.match(e.request)
-.then(res=> res || fetch(e.request))
-)
-})
+.controls{
+display:flex;
+justify-content:space-between;
+width:90%;
+margin:20px auto;
+}
+
+.controls button{
+width:45%;
+padding:15px;
+font-size:22px;
+border:none;
+border-radius:10px;
+}
+
+#left{
+background:#444;
+}
+
+#right{
+background:#444;
+}
+
+/* botão iniciar desativado */
+button:disabled{
+background:#666;
+opacity:0.6;
+}
+
+canvas{
+width:90%;
+max-width:300px;
+height:auto;
+}
+
+.hud{
+display:flex;
+justify-content:space-around;
+align-items:center;
+background:#000;
+padding:10px;
+font-size:16px;
+border-bottom:2px solid #333;
+}
+
+.hud div{
+background:#111;
+padding:8px 12px;
+border-radius:8px;
+}
