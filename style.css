@@ -1,24 +1,22 @@
-body{
-margin:0;
-text-align:center;
-background:#111;
-color:white;
-font-family:Arial;
-}
+const cacheName = "desvie-pro-v1"
 
-canvas{
-background:#222;
-display:block;
-margin:auto;
-border-radius:10px;
-}
+const files = [
+"/",
+"/index.html",
+"/style.css",
+"/app.js"
+]
 
-button{
-margin:5px;
-padding:10px 20px;
-font-size:18px;
-}
+self.addEventListener("install", e=>{
+e.waitUntil(
+caches.open(cacheName)
+.then(cache=>cache.addAll(files))
+)
+})
 
-.controls{
-margin-top:10px;
-}
+self.addEventListener("fetch", e=>{
+e.respondWith(
+caches.match(e.request)
+.then(res=> res || fetch(e.request))
+)
+})
