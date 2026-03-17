@@ -1,0 +1,24 @@
+body{
+margin:0;
+text-align:center;
+background:#111;
+color:white;
+font-family:Arial;
+}
+
+canvas{
+background:#222;
+display:block;
+margin:auto;
+border-radius:10px;
+}
+
+button{
+margin:5px;
+padding:10px 20px;
+font-size:18px;
+}
+
+.controls{
+margin-top:10px;
+}
