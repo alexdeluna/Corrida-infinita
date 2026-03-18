@@ -5,32 +5,31 @@ canvas.width = 300
 canvas.height = 500
 
 // CONFIG
-const MAX_ENEMIES = 6
-const LIFE_SCORE = 100
+const MAX_ENEMIES = 7
 const MIN_DISTANCE = 80
-
-// ========================
-// VARIÁVEIS
-// ========================
+const LIFE_SCORE = 100
 
 let player
 let obstacles = []
 let diagonalEnemies = []
 let dropEnemies = []
 let hunterEnemies = []
+let hunterFragments = []
+let whiteEnemies = []
 let bullets = []
 
 let score, bestScore, gameRunning, speed, lives
-let nextLifeScore
 let bombs = 0
+let nextLifeScore
 
 let lastShot = 0
 
-// timers spawn
+// timers
 let lastSpawnTime = 0
 let lastDiagonalSpawn = 0
 let lastDropSpawn = 0
 let lastHunterSpawn = 0
+let lastWhiteSpawn = 0
 
 // UI
 const scoreText = document.getElementById("score")
@@ -49,25 +48,23 @@ bombBtn.onclick = useBomb
 bestScore = localStorage.getItem("bestScore") || 0
 bestText.innerText = bestScore
 
-// ========================
 // START
-// ========================
-
 function startGame(){
-
 player = { x:130, y:450, width:40, height:40 }
 
 obstacles = []
 diagonalEnemies = []
 dropEnemies = []
 hunterEnemies = []
+hunterFragments = []
+whiteEnemies = []
 bullets = []
 
 score = 0
 lives = 3
 speed = 2
-
 bombs = 0
+
 nextLifeScore = LIFE_SCORE
 
 gameRunning = true
@@ -77,23 +74,16 @@ startBtn.innerText = "Jogando..."
 
 updateUI()
 gameLoop()
-
 }
 
-// ========================
 // UI
-// ========================
-
 function updateUI(){
 scoreText.innerText = score
 livesText.innerText = lives
-bombText.innerText = bombs
+if(bombText) bombText.innerText = bombs
 }
 
-// ========================
 // CONTROLES
-// ========================
-
 let moveLeft = false
 let moveRight = false
 
@@ -113,16 +103,14 @@ if(e.key === "ArrowLeft") moveLeft = false
 if(e.key === "ArrowRight") moveRight = false
 })
 
-// ========================
 // AUX
-// ========================
-
 function totalEnemies(){
-return obstacles.length + diagonalEnemies.length + dropEnemies.length + hunterEnemies.length
+return obstacles.length + diagonalEnemies.length + dropEnemies.length +
+hunterEnemies.length + hunterFragments.length + whiteEnemies.length
 }
 
 function isFarEnough(x){
-const all = [...obstacles, ...diagonalEnemies, ...dropEnemies, ...hunterEnemies]
+const all = [...obstacles,...diagonalEnemies,...dropEnemies,...hunterEnemies,...whiteEnemies]
 return all.every(e => Math.abs(e.x - x) > MIN_DISTANCE)
 }
 
@@ -135,12 +123,8 @@ a.y + a.height > b.y
 )
 }
 
-// ========================
-// PONTUAÇÃO
-// ========================
-
+// PONTOS
 function gainPoint(){
-
 score++
 updateUI()
 
@@ -152,15 +136,10 @@ nextLifeScore += LIFE_SCORE
 if(score % 10 === 0){
 bombs++
 }
-
 }
 
-// ========================
 // TIRO
-// ========================
-
 function shoot(){
-
 bullets.push({
 x: player.x + player.width/2 - 3,
 y: player.y,
@@ -168,15 +147,10 @@ width:6,
 height:15,
 speed:7
 })
-
 }
 
-// ========================
 // BOMBA
-// ========================
-
 function useBomb(){
-
 if(score < 20 || bombs <= 0) return
 
 bombs--
@@ -186,86 +160,73 @@ obstacles = []
 diagonalEnemies = []
 dropEnemies = []
 hunterEnemies = []
-
+hunterFragments = []
+whiteEnemies = []
 }
 
-// ========================
 // SPAWNS
-// ========================
-
 function spawnObstacle(){
-
-let x
-let tries = 0
-
+let x, tries=0
 do{
 x = Math.random()*260
 tries++
 }while(!isFarEnough(x) && tries < 10)
 
-obstacles.push({
-x, y:-40,
-width:40,
-height:40,
-speed:2+Math.random()*1.5
-})
-
+obstacles.push({ x, y:-40, width:40, height:40, speed:2+Math.random()*1.5 })
 }
 
 function spawnDiagonalEnemy(){
-
 let x = Math.random()*260
 if(!isFarEnough(x)) return
 
 diagonalEnemies.push({
-x, y:-30,
-width:30,
-height:30,
+x, y:-30, width:30, height:30,
 velX:(Math.random()<0.5?-1:1)*2,
 velY:3
 })
-
 }
 
 function spawnDropEnemy(){
-
 let x = Math.random()*260
 if(!isFarEnough(x)) return
 
 dropEnemies.push({
-x, y:0,
-width:35,
-height:35,
-state:"waiting",
-timer:Date.now()
+x, y:0, width:35, height:35,
+state:"waiting", timer:Date.now()
 })
-
 }
 
 function spawnHunterEnemy(){
-
 let x = Math.random()*260
 if(!isFarEnough(x)) return
 
 hunterEnemies.push({
-x, y:-35,
-width:35,
-height:35,
+x, y:-35, width:35, height:35,
 speed:2,
 targetX:0,
 lastUpdate:0,
-reactionTime:500
+reactionTime:500,
+hp:3
 })
-
 }
 
-// ========================
-// UPDATE
-// ========================
+function spawnWhiteEnemy(){
+let x = Math.random()*260
+if(!isFarEnough(x)) return
 
+whiteEnemies.push({
+x,
+y:-30,
+width:30,
+height:30,
+hp:2,
+angle:0
+})
+}
+
+// UPDATE
 function update(){
 
-// movimento
 if(moveLeft) player.x -= 5
 if(moveRight) player.x += 5
 
@@ -273,116 +234,101 @@ player.x = Math.max(0, Math.min(canvas.width - player.width, player.x))
 
 const now = Date.now()
 
-// TIRO AUTOMÁTICO
+// TIRO
 if(score >= 20 && now - lastShot > 500){
 shoot()
 lastShot = now
 }
 
 // SPAWNS
-
 if(now - lastSpawnTime > 1400 && totalEnemies() < MAX_ENEMIES){
 spawnObstacle()
 lastSpawnTime = now
 }
 
-if(score > 10 && now - lastDiagonalSpawn > 2500 && diagonalEnemies.length < 2){
+if(score > 10 && now - lastDiagonalSpawn > 2500){
 spawnDiagonalEnemy()
 lastDiagonalSpawn = now
 }
 
-if(score > 15 && now - lastDropSpawn > 3500 && dropEnemies.length < 2){
+if(score > 15 && now - lastDropSpawn > 3500){
 spawnDropEnemy()
 lastDropSpawn = now
 }
 
-if(score > 25 && now - lastHunterSpawn > 5000 && hunterEnemies.length < 1){
+if(score > 25 && now - lastHunterSpawn > 5000){
 spawnHunterEnemy()
 lastHunterSpawn = now
 }
 
-// ========================
-// BULLETS
-// ========================
+if(score >= 30 && now - lastWhiteSpawn > 4000){
+spawnWhiteEnemy()
+lastWhiteSpawn = now
+}
 
+// BULLETS
 bullets.forEach((b,i)=>{
 b.y -= b.speed
-
 if(b.y < 0) bullets.splice(i,1)
 
-// colisão com TODOS inimigos
-;[obstacles, diagonalEnemies, dropEnemies, hunterEnemies].forEach(arr=>{
+// colisões
+function hitEnemy(arr, enemy, index){
+if(enemy.hp){
+enemy.hp--
+if(enemy.hp <= 0){
+
+// divisão roxa
+if(arr === hunterEnemies){
+createFragments(enemy)
+}
+
+arr.splice(index,1)
+gainPoint()
+}
+}else{
+arr.splice(index,1)
+gainPoint()
+}
+}
+
+;[obstacles, diagonalEnemies, dropEnemies, hunterEnemies, hunterFragments, whiteEnemies]
+.forEach(arr=>{
 arr.forEach((e,ei)=>{
 if(collide(b,e)){
 bullets.splice(i,1)
-arr.splice(ei,1)
-gainPoint()
+hitEnemy(arr,e,ei)
 }
 })
 })
 
 })
 
-// ========================
 // NORMAL
-// ========================
-
 obstacles.forEach((o,i)=>{
 o.y += o.speed
-
-if(o.y > canvas.height){
-gainPoint()
-obstacles.splice(i,1)
-}
-
+if(o.y > canvas.height){ gainPoint(); obstacles.splice(i,1) }
 if(collide(player,o)) hit(i, obstacles)
 })
 
-// ========================
 // DIAGONAL
-// ========================
-
 diagonalEnemies.forEach((e,i)=>{
 e.x += e.velX
 e.y += e.velY
-
 if(e.x <=0 || e.x+e.width>=canvas.width) e.velX *= -1
-
-if(e.y > canvas.height){
-gainPoint()
-diagonalEnemies.splice(i,1)
-}
-
+if(e.y > canvas.height){ gainPoint(); diagonalEnemies.splice(i,1) }
 if(collide(player,e)) hit(i, diagonalEnemies)
 })
 
-// ========================
 // DROP
-// ========================
-
 dropEnemies.forEach((e,i)=>{
-
-if(e.state==="waiting" && now - e.timer > 3000){
-e.state="falling"
-}
-
+if(e.state==="waiting" && now - e.timer > 3000){ e.state="falling" }
 if(e.state==="falling") e.y += 10
-
-if(e.y > canvas.height){
-gainPoint()
-dropEnemies.splice(i,1)
-}
-
+if(e.y > canvas.height){ gainPoint(); dropEnemies.splice(i,1) }
 if(collide(player,e)) hit(i, dropEnemies)
-
 })
 
-// ========================
-// HUNTER
-// ========================
-
+// ROXO
 hunterEnemies.forEach((h,i)=>{
-
 if(now - h.lastUpdate > h.reactionTime){
 h.targetX = player.x
 h.lastUpdate = now
@@ -393,19 +339,30 @@ if(h.x > h.targetX) h.x -= 1.2
 
 h.y += h.speed
 
-if(h.y > canvas.height){
-gainPoint()
-hunterEnemies.splice(i,1)
-}
-
+if(h.y > canvas.height){ gainPoint(); hunterEnemies.splice(i,1) }
 if(collide(player,h)) hit(i, hunterEnemies)
-
 })
 
-// ========================
-// DANO
-// ========================
+// FRAGMENTOS
+hunterFragments.forEach((f,i)=>{
+f.x += f.velX
+f.y += f.velY
 
+if(f.y > canvas.height){ gainPoint(); hunterFragments.splice(i,1) }
+if(collide(player,f)) hit(i, hunterFragments)
+})
+
+// BRANCO (folha)
+whiteEnemies.forEach((w,i)=>{
+w.angle += 0.05
+w.x += Math.sin(w.angle)*2
+w.y += 2
+
+if(w.y > canvas.height){ gainPoint(); whiteEnemies.splice(i,1) }
+if(collide(player,w)) hit(i, whiteEnemies)
+})
+
+// DANO
 function hit(i, arr){
 lives--
 updateUI()
@@ -415,10 +372,30 @@ if(lives <= 0) endGame()
 
 }
 
-// ========================
-// DRAW
-// ========================
+// CRIA FRAGMENTOS ROXO
+function createFragments(enemy){
 
+hunterFragments.push({
+x: enemy.x,
+y: enemy.y,
+width:20,
+height:20,
+velX:2,
+velY:3
+})
+
+hunterFragments.push({
+x: enemy.x,
+y: enemy.y,
+width:20,
+height:20,
+velX:-2,
+velY:3
+})
+
+}
+
+// DRAW
 function draw(){
 
 ctx.clearRect(0,0,canvas.width,canvas.height)
@@ -442,16 +419,19 @@ ctx.fillRect(e.x,e.y,e.width,e.height)
 ctx.fillStyle="purple"
 hunterEnemies.forEach(h=>ctx.fillRect(h.x,h.y,h.width,h.height))
 
+ctx.fillStyle="violet"
+hunterFragments.forEach(f=>ctx.fillRect(f.x,f.y,f.width,f.height))
+
+ctx.fillStyle="white"
+whiteEnemies.forEach(w=>ctx.fillRect(w.x,w.y,w.width,w.height))
+
 // tiros
 ctx.fillStyle="white"
 bullets.forEach(b=>ctx.fillRect(b.x,b.y,b.width,b.height))
 
 }
 
-// ========================
 // LOOP
-// ========================
-
 function gameLoop(){
 if(!gameRunning) return
 update()
@@ -459,10 +439,7 @@ draw()
 requestAnimationFrame(gameLoop)
 }
 
-// ========================
 // FIM
-// ========================
-
 function endGame(){
 
 gameRunning = false
@@ -483,10 +460,7 @@ startBtn.innerText = "Jogar Novamente"
 
 }
 
-// ========================
 // PWA
-// ========================
-
 if("serviceWorker" in navigator){
 navigator.serviceWorker.register("sw.js")
 }
