@@ -7,6 +7,11 @@ canvas.height = 500
 // CONFIG
 const MAX_ENEMIES = 6
 const LIFE_SCORE = 100
+const MIN_DISTANCE = 80
+
+// ========================
+// VARIÁVEIS
+// ========================
 
 let player
 let obstacles = []
@@ -17,10 +22,15 @@ let bullets = []
 
 let score, bestScore, gameRunning, speed, lives
 let nextLifeScore
-
 let bombs = 0
 
 let lastShot = 0
+
+// timers spawn
+let lastSpawnTime = 0
+let lastDiagonalSpawn = 0
+let lastDropSpawn = 0
+let lastHunterSpawn = 0
 
 // UI
 const scoreText = document.getElementById("score")
@@ -111,6 +121,11 @@ function totalEnemies(){
 return obstacles.length + diagonalEnemies.length + dropEnemies.length + hunterEnemies.length
 }
 
+function isFarEnough(x){
+const all = [...obstacles, ...diagonalEnemies, ...dropEnemies, ...hunterEnemies]
+return all.every(e => Math.abs(e.x - x) > MIN_DISTANCE)
+}
+
 function collide(a,b){
 return (
 a.x < b.x + b.width &&
@@ -129,21 +144,13 @@ function gainPoint(){
 score++
 updateUI()
 
-// VIDA
 if(score >= nextLifeScore){
 lives++
 nextLifeScore += LIFE_SCORE
 }
 
-// BOMBA
 if(score % 10 === 0){
 bombs++
-}
-
-// TIRO AUTOMÁTICO
-if(score >= 20 && Date.now() - lastShot > 1000){
-shoot()
-lastShot = Date.now()
 }
 
 }
@@ -159,7 +166,7 @@ x: player.x + player.width/2 - 3,
 y: player.y,
 width:6,
 height:15,
-speed:6
+speed:7
 })
 
 }
@@ -170,34 +177,86 @@ speed:6
 
 function useBomb(){
 
-if(score < 20) return
-if(bombs <= 0) return
+if(score < 20 || bombs <= 0) return
 
 bombs--
 updateUI()
 
-// limpa tudo
 obstacles = []
 diagonalEnemies = []
 dropEnemies = []
 hunterEnemies = []
 
-if(navigator.vibrate) navigator.vibrate(300)
-
 }
 
 // ========================
-// SPAWN SIMPLES (reduzido)
+// SPAWNS
 // ========================
 
 function spawnObstacle(){
+
+let x
+let tries = 0
+
+do{
+x = Math.random()*260
+tries++
+}while(!isFarEnough(x) && tries < 10)
+
 obstacles.push({
-x: Math.random()*260,
-y:-40,
+x, y:-40,
 width:40,
 height:40,
 speed:2+Math.random()*1.5
 })
+
+}
+
+function spawnDiagonalEnemy(){
+
+let x = Math.random()*260
+if(!isFarEnough(x)) return
+
+diagonalEnemies.push({
+x, y:-30,
+width:30,
+height:30,
+velX:(Math.random()<0.5?-1:1)*2,
+velY:3
+})
+
+}
+
+function spawnDropEnemy(){
+
+let x = Math.random()*260
+if(!isFarEnough(x)) return
+
+dropEnemies.push({
+x, y:0,
+width:35,
+height:35,
+state:"waiting",
+timer:Date.now()
+})
+
+}
+
+function spawnHunterEnemy(){
+
+let x = Math.random()*260
+if(!isFarEnough(x)) return
+
+hunterEnemies.push({
+x, y:-35,
+width:35,
+height:35,
+speed:2,
+targetX:0,
+lastUpdate:0,
+reactionTime:500
+})
+
 }
 
 // ========================
@@ -212,9 +271,34 @@ if(moveRight) player.x += 5
 
 player.x = Math.max(0, Math.min(canvas.width - player.width, player.x))
 
-// spawn simples equilibrado
-if(Math.random() < 0.02 && totalEnemies() < MAX_ENEMIES){
+const now = Date.now()
+
+// TIRO AUTOMÁTICO
+if(score >= 20 && now - lastShot > 500){
+shoot()
+lastShot = now
+}
+
+// SPAWNS
+
+if(now - lastSpawnTime > 1400 && totalEnemies() < MAX_ENEMIES){
 spawnObstacle()
+lastSpawnTime = now
+}
+
+if(score > 10 && now - lastDiagonalSpawn > 2500 && diagonalEnemies.length < 2){
+spawnDiagonalEnemy()
+lastDiagonalSpawn = now
+}
+
+if(score > 15 && now - lastDropSpawn > 3500 && dropEnemies.length < 2){
+spawnDropEnemy()
+lastDropSpawn = now
+}
+
+if(score > 25 && now - lastHunterSpawn > 5000 && hunterEnemies.length < 1){
+spawnHunterEnemy()
+lastHunterSpawn = now
 }
 
 // ========================
@@ -224,23 +308,23 @@ spawnObstacle()
 bullets.forEach((b,i)=>{
 b.y -= b.speed
 
-if(b.y < 0){
-bullets.splice(i,1)
-}
+if(b.y < 0) bullets.splice(i,1)
 
-// colisão com inimigos
-obstacles.forEach((o,oi)=>{
-if(collide(b,o)){
+// colisão com TODOS inimigos
+;[obstacles, diagonalEnemies, dropEnemies, hunterEnemies].forEach(arr=>{
+arr.forEach((e,ei)=>{
+if(collide(b,e)){
 bullets.splice(i,1)
-obstacles.splice(oi,1)
+arr.splice(ei,1)
 gainPoint()
 }
+})
 })
 
 })
 
 // ========================
-// INIMIGOS
+// NORMAL
 // ========================
 
 obstacles.forEach((o,i)=>{
@@ -251,16 +335,128 @@ gainPoint()
 obstacles.splice(i,1)
 }
 
-if(collide(player,o)){
-lives--
-updateUI()
-obstacles.splice(i,1)
+if(collide(player,o)) hit(i, obstacles)
+})
 
-if(lives <= 0) endGame()
+// ========================
+// DIAGONAL
+// ========================
+
+diagonalEnemies.forEach((e,i)=>{
+e.x += e.velX
+e.y += e.velY
+
+if(e.x <=0 || e.x+e.width>=canvas.width) e.velX *= -1
+
+if(e.y > canvas.height){
+gainPoint()
+diagonalEnemies.splice(i,1)
 }
+
+if(collide(player,e)) hit(i, diagonalEnemies)
+})
+
+// ========================
+// DROP
+// ========================
+
+dropEnemies.forEach((e,i)=>{
+
+if(e.state==="waiting" && now - e.timer > 3000){
+e.state="falling"
+}
+
+if(e.state==="falling") e.y += 10
+
+if(e.y > canvas.height){
+gainPoint()
+dropEnemies.splice(i,1)
+}
+
+if(collide(player,e)) hit(i, dropEnemies)
 
 })
 
+// ========================
+// HUNTER
+// ========================
+
+hunterEnemies.forEach((h,i)=>{
+
+if(now - h.lastUpdate > h.reactionTime){
+h.targetX = player.x
+h.lastUpdate = now
+}
+
+if(h.x < h.targetX) h.x += 1.2
+if(h.x > h.targetX) h.x -= 1.2
+
+h.y += h.speed
+
+if(h.y > canvas.height){
+gainPoint()
+hunterEnemies.splice(i,1)
+}
+
+if(collide(player,h)) hit(i, hunterEnemies)
+
+})
+
+// ========================
+// DANO
+// ========================
+
+function hit(i, arr){
+lives--
+updateUI()
+arr.splice(i,1)
+if(lives <= 0) endGame()
+}
+
+}
+
+// ========================
+// DRAW
+// ========================
+
+function draw(){
+
+ctx.clearRect(0,0,canvas.width,canvas.height)
+
+// player
+ctx.fillStyle="lime"
+ctx.fillRect(player.x,player.y,player.width,player.height)
+
+// inimigos
+ctx.fillStyle="red"
+obstacles.forEach(o=>ctx.fillRect(o.x,o.y,o.width,o.height))
+
+ctx.fillStyle="cyan"
+diagonalEnemies.forEach(e=>ctx.fillRect(e.x,e.y,e.width,e.height))
+
+dropEnemies.forEach(e=>{
+ctx.fillStyle = e.state==="waiting"?"yellow":"orange"
+ctx.fillRect(e.x,e.y,e.width,e.height)
+})
+
+ctx.fillStyle="purple"
+hunterEnemies.forEach(h=>ctx.fillRect(h.x,h.y,h.width,h.height))
+
+// tiros
+ctx.fillStyle="white"
+bullets.forEach(b=>ctx.fillRect(b.x,b.y,b.width,b.height))
+
+}
+
+// ========================
+// LOOP
+// ========================
+
+function gameLoop(){
+if(!gameRunning) return
+update()
+draw()
+requestAnimationFrame(gameLoop)
 }
 
 // ========================
@@ -288,39 +484,9 @@ startBtn.innerText = "Jogar Novamente"
 }
 
 // ========================
-// DRAW
-// ========================
-
-function draw(){
-
-ctx.clearRect(0,0,canvas.width,canvas.height)
-
-// player
-ctx.fillStyle="lime"
-ctx.fillRect(player.x,player.y,player.width,player.height)
-
-// inimigos
-ctx.fillStyle="red"
-obstacles.forEach(o=>ctx.fillRect(o.x,o.y,o.width,o.height))
-
-// tiros
-ctx.fillStyle="cyan"
-bullets.forEach(b=>ctx.fillRect(b.x,b.y,b.width,b.height))
-
-}
-
-// ========================
-// LOOP
-// ========================
-
-function gameLoop(){
-if(!gameRunning) return
-update()
-draw()
-requestAnimationFrame(gameLoop)
-}
-
 // PWA
+// ========================
+
 if("serviceWorker" in navigator){
 navigator.serviceWorker.register("sw.js")
 }
