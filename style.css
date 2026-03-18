@@ -69,3 +69,13 @@ background:#111;
 padding:8px 12px;
 border-radius:8px;
 }
+
+#bomb{
+background:#222;
+color:#fff;
+border:none;
+padding:12px 20px;
+border-radius:10px;
+font-size:18px;
+margin-top:10px;
+}
