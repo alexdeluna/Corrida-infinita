@@ -1,3 +1,7 @@
+vou te mandar os arquivos app.js e index.html pata vc verificar o morivo pelo qual o jogo quebrou.
+
+app.js
+
 // ================= CANVAS =================
 const canvas = document.getElementById("game")
 const ctx = canvas.getContext("2d")
@@ -371,3 +375,137 @@ startBtn.disabled=false
 if("serviceWorker" in navigator){
 navigator.serviceWorker.register("sw.js")
 }
+
+
+index.htnl
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Desvie dos Obstáculos PRO</title>
+
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+
+<style>
+
+/* ===== TOPO INFO ===== */
+.top-bar{
+display:flex;
+justify-content:space-around;
+font-size:14px;
+margin-top:10px;
+}
+
+/* ===== CANVAS ===== */
+canvas{
+background:#222;
+display:block;
+margin:10px auto;
+border-radius:10px;
+}
+
+/* ===== CONTROLES ===== */
+.controls{
+display:flex;
+justify-content:space-between;
+width:90%;
+margin:10px auto;
+}
+
+.controls button{
+width:45%;
+padding:15px;
+font-size:22px;
+border:none;
+border-radius:10px;
+}
+
+/* ===== AREA INFERIOR ===== */
+.bottom-area{
+display:flex;
+justify-content:center;
+align-items:center;
+gap:10px;
+margin:10px;
+}
+
+/* ===== BOTÃO START ===== */
+#start{
+padding:10px 20px;
+font-size:16px;
+}
+
+/* ===== PAINEL EXTRA ===== */
+.side-panel{
+display:flex;
+flex-direction:column;
+gap:5px;
+}
+
+.side-panel button{
+font-size:12px;
+padding:6px;
+border:none;
+border-radius:6px;
+}
+
+/* ===== BOMBA ===== */
+#bomb{
+padding:10px;
+font-size:18px;
+}
+
+/* ===== DESATIVADO ===== */
+button:disabled{
+opacity:0.5;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<!-- ===== INFORMAÇÕES ===== -->
+<div class="top-bar">
+<div>Pontos: <span id="score">0</span></div>
+<div>Recorde: <span id="best">0</span></div>
+<div>Vidas: <span id="lives">3</span></div>
+<div>Bombas: <span id="bombCount">0</span></div>
+</div>
+
+<!-- ===== JOGO ===== -->
+<canvas id="game"></canvas>
+
+<!-- ===== CONTROLES ===== -->
+<div class="controls">
+<button id="left">⬅️</button>
+<button id="right">➡️</button>
+</div>
+
+<!-- ===== ÁREA INFERIOR ===== -->
+<div class="bottom-area">
+
+<button id="start">Iniciar</button>
+
+<!-- PAINEL AO LADO DO START -->
+<div class="side-panel">
+<button id="pause">⏸️</button>
+<button id="resume" style="display:none;">▶️</button>
+<button id="save">💾</button>
+<button id="load">📂</button>
+</div>
+
+<!-- BOMBA -->
+<button id="bomb">💣</button>
+
+</div>
+
+<script src="app.js"></script>
+
+</
