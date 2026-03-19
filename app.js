@@ -10,11 +10,9 @@ const MAX_ENEMIES = 6
 const MIN_DISTANCE = 70
 
 // ================= STATE =================
-let player, bullets = []
-
+let player, bullets=[]
 let enemies=[], blues=[], yellows=[], hunters=[], fragments=[], whites=[]
 let powerUps=[]
-
 let satellites=0
 
 let score=0, lives=3, bombs=0
@@ -35,7 +33,6 @@ let gameRunning=false
 // ================= UI =================
 const scoreText = document.getElementById("score")
 const livesText = document.getElementById("lives")
-const bestText = document.getElementById("best")
 
 const startBtn = document.getElementById("start")
 const leftBtn = document.getElementById("left")
@@ -125,34 +122,68 @@ bullets.push({x:player.x-10,y:player.y,width:6,height:15,speed:7})
 }
 }
 
-// ================= SPAWN =================
-function spawnEnemy(){
-let x=Math.random()*260
-if(!isFar(x)) return
+// ================= SPAWN INTELIGENTE =================
+function spawnSmartEnemy(){
 
+if(totalEnemies()>=MAX_ENEMIES) return
+
+let attempts=0
+
+while(attempts<5){
+
+let x=Math.random()*260
+if(!isFar(x)){attempts++;continue}
+
+let r=Math.random()
+
+// early game
+if(score<20){
+spawnRed(x)
+return
+}
+
+// mid game
+if(score<50){
+if(r<0.5) spawnRed(x)
+else if(r<0.8) spawnBlue(x)
+else spawnYellow(x)
+return
+}
+
+// late game
+if(r<0.25) spawnRed(x)
+else if(r<0.5) spawnBlue(x)
+else if(r<0.7) spawnYellow(x)
+else if(r<0.9) spawnHunter(x)
+else spawnWhite(x)
+
+return
+}
+
+}
+
+// ================= SPAWN TYPES =================
+function spawnRed(x){
 enemies.push({x,y:-40,width:40,height:40,speed:2+Math.random()*1.5})
 }
 
-function spawnBlue(){
-let x=Math.random()*260
-blues.push({x,y:-30,width:30,height:30,vx:2,vy:3})
+function spawnBlue(x){
+blues.push({x,y:-30,width:30,height:30,vx:(Math.random()<0.5?-2:2),vy:3})
 }
 
-function spawnYellow(){
-let x=Math.random()*260
+function spawnYellow(x){
 yellows.push({x,y:0,width:30,height:30,state:"wait",time:Date.now()})
 }
 
-function spawnHunter(){
-let x=Math.random()*260
-hunters.push({x,y:-30,width:30,height:30,targetX:0,last:0,hp:3})
+function spawnHunter(x){
+hunters.push({x,y:-30,width:30,height:30,hp:3,last:0})
 }
 
-function spawnWhite(){
-let x=Math.random()*260
+function spawnWhite(x){
 whites.push({x,y:-30,width:30,height:30,angle:0,hp:2})
 }
 
+// ================= POWER-UP =================
 function spawnPowerUp(){
 powerUps.push({x:Math.random()*260,y:-30,size:30,speed:2})
 }
@@ -207,16 +238,12 @@ bossState="move"
 bossTimer=now
 }
 }
-
 }
 
 function spawnBossEnemies(){
-
-enemies.push({x:boss.x,y:boss.y,width:25,height:25,speed:3+phase})
-
-fragments.push({x:boss.x,y:boss.y,width:20,height:20,velX:2,velY:3})
-
-yellows.push({x:boss.x+40,y:boss.y,width:25,height:25,state:"fall"})
+spawnRed(boss.x)
+spawnBlue(boss.x+30)
+spawnYellow(boss.x+60)
 }
 
 function killBoss(){
@@ -243,6 +270,7 @@ player.x=Math.max(0,Math.min(canvas.width-player.width,player.x))
 
 const now=Date.now()
 
+// tiro
 if(score>=20 && now-lastShot>500){
 shoot()
 lastShot=now
@@ -257,15 +285,14 @@ if(isBoss){
 updateBoss()
 }else{
 
-if(now-lastSpawn>1200 && totalEnemies()<MAX_ENEMIES){
-spawnEnemy()
-
-if(score>10) spawnBlue()
-if(score>20) spawnYellow()
-if(score>30) spawnHunter()
-if(score>30) spawnWhite()
-
+if(now-lastSpawn>1200){
+spawnSmartEnemy()
 lastSpawn=now
+}
+
+// fallback (anti-travamento)
+if(totalEnemies()===0){
+spawnRed(Math.random()*260)
 }
 
 if(score>=nextPowerUpScore){
@@ -275,11 +302,10 @@ nextPowerUpScore+=20
 
 }
 
-// bullets
+// ================= BULLETS =================
 bullets.forEach((b,i)=>{
 b.y-=b.speed
-
-if(b.y<0){ bullets.splice(i,1); return }
+if(b.y<0){bullets.splice(i,1);return}
 
 if(isBoss && collide(b,boss)){
 boss.hp--
@@ -287,24 +313,77 @@ bullets.splice(i,1)
 if(boss.hp<=0) killBoss()
 }
 
-enemies.forEach((e,ei)=>{
-if(collide(b,e)){ bullets.splice(i,1); enemies.splice(ei,1); score++ }
+// colisão geral
+;[enemies,blues,yellows,hunters,whites].forEach(arr=>{
+arr.forEach((e,ei)=>{
+if(collide(b,e)){
+bullets.splice(i,1)
+arr.splice(ei,1)
+score++
+}
 })
 })
 
-// enemies update (resumido p/ estabilidade)
+})
+
+// ================= UPDATE ENEMIES =================
 enemies.forEach((e,i)=>{
 e.y+=e.speed
-if(e.y>canvas.height){score++; enemies.splice(i,1)}
-if(collide(player,e)){takeDamage(); enemies.splice(i,1)}
+if(e.y>canvas.height){score++;enemies.splice(i,1)}
+if(collide(player,e)){takeDamage();enemies.splice(i,1)}
 })
 
-// powerups
+blues.forEach((b,i)=>{
+b.x+=b.vx
+b.y+=b.vy
+
+if(b.x<=0||b.x+30>=canvas.width) b.vx*=-1
+
+if(b.y>canvas.height){score++;blues.splice(i,1)}
+if(collide(player,b)){takeDamage();blues.splice(i,1)}
+})
+
+yellows.forEach((y,i)=>{
+if(y.state==="wait"){
+if(Date.now()-y.time>1000) y.state="fall"
+}else{
+y.y+=6
+}
+if(y.y>canvas.height){score++;yellows.splice(i,1)}
+if(collide(player,y)){takeDamage();yellows.splice(i,1)}
+})
+
+hunters.forEach((h,i)=>{
+if(Date.now()-h.last>500){
+h.targetX=player.x
+h.last=Date.now()
+}
+h.x+=(h.targetX-h.x)*0.05
+h.y+=2
+
+if(h.y>canvas.height){score++;hunters.splice(i,1)}
+if(collide(player,h)){takeDamage();hunters.splice(i,1)}
+})
+
+whites.forEach((w,i)=>{
+w.angle+=0.1
+w.x+=Math.sin(w.angle)*2
+w.y+=2
+
+if(w.y>canvas.height){score++;whites.splice(i,1)}
+if(collide(player,w)){takeDamage();whites.splice(i,1)}
+})
+
+// ================= POWERUP =================
 powerUps.forEach((p,i)=>{
 p.y+=p.speed
-if(collide(player,p)){powerUps.splice(i,1); if(satellites<2)satellites++}
+if(collide(player,p)){
+powerUps.splice(i,1)
+if(satellites<2) satellites++
+}
 })
 
+// vida extra
 if(score>=nextLifeScore){
 lives++
 nextLifeScore+=100
@@ -331,6 +410,18 @@ if(satellites>=2) ctx.fillRect(player.x-25,player.y,20,20)
 ctx.fillStyle="red"
 enemies.forEach(e=>ctx.fillRect(e.x,e.y,e.width,e.height))
 
+ctx.fillStyle="blue"
+blues.forEach(b=>ctx.fillRect(b.x,b.y,b.width,b.height))
+
+ctx.fillStyle="yellow"
+yellows.forEach(y=>ctx.fillRect(y.x,y.y,y.width,y.height))
+
+ctx.fillStyle="purple"
+hunters.forEach(h=>ctx.fillRect(h.x,h.y,h.width,h.height))
+
+ctx.fillStyle="white"
+whites.forEach(w=>ctx.fillRect(w.x,w.y,w.width,w.height))
+
 // tiros
 ctx.fillStyle="white"
 bullets.forEach(b=>ctx.fillRect(b.x,b.y,b.width,b.height))
@@ -350,6 +441,7 @@ ctx.fillRect(boss.x,boss.y,boss.width,boss.height)
 
 ctx.fillStyle="red"
 ctx.fillRect(20,10,260,10)
+
 ctx.fillStyle="lime"
 ctx.fillRect(20,10,(boss.hp/boss.maxHp)*260,10)
 }
