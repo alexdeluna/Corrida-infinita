@@ -6,12 +6,13 @@ canvas.width = 300
 canvas.height = 500
 
 // ================= CONFIG =================
-const MAX_ENEMIES = 6
+const MAX_ENEMIES = 7
 const MIN_DISTANCE = 70
 
 // ================= STATE =================
 let player, bullets=[]
-let enemies=[], blues=[], yellows=[], hunters=[], whites=[]
+let enemies=[], blues=[], yellows=[], hunters=[], whites=[], snipers=[]
+let enemyBullets=[]
 let powerUps=[]
 
 let satellites=0
@@ -51,7 +52,8 @@ function startGame(){
 player={x:130,y:450,width:40,height:40}
 
 bullets=[]
-enemies=[];blues=[];yellows=[];hunters=[];whites=[]
+enemies=[];blues=[];yellows=[];hunters=[];whites=[];snipers=[]
+enemyBullets=[]
 powerUps=[]
 
 satellites=0
@@ -94,11 +96,11 @@ a.y<b.y+b.height && a.y+a.height>b.y
 }
 
 function totalEnemies(){
-return enemies.length+blues.length+yellows.length+hunters.length+whites.length
+return enemies.length+blues.length+yellows.length+hunters.length+whites.length+snipers.length
 }
 
 function isFar(x){
-return [...enemies,...blues,...yellows,...hunters,...whites]
+return [...enemies,...blues,...yellows,...hunters,...whites,...snipers]
 .every(e=>Math.abs(e.x-x)>MIN_DISTANCE)
 }
 
@@ -133,7 +135,7 @@ bullets.push({x:player.x-10,y:player.y,width:6,height:15,speed:7})
 }
 }
 
-// ================= SPAWN INTELIGENTE =================
+// ================= SPAWN =================
 function spawnSmartEnemy(){
 
 if(totalEnemies()>=MAX_ENEMIES) return
@@ -147,6 +149,12 @@ if(!isFar(x)){attempts++;continue}
 
 let r=Math.random()
 
+// sniper (marrom)
+if(score>=40 && Math.random()<0.15){
+spawnSniper(x)
+return
+}
+
 if(score<20){
 spawnRed(x)
 return
@@ -159,10 +167,11 @@ else spawnYellow(x)
 return
 }
 
-if(r<0.25) spawnRed(x)
-else if(r<0.5) spawnBlue(x)
-else if(r<0.7) spawnYellow(x)
-else if(r<0.9) spawnHunter(x)
+// late game
+if(r<0.2) spawnRed(x)
+else if(r<0.4) spawnBlue(x)
+else if(r<0.6) spawnYellow(x)
+else if(r<0.8) spawnHunter(x)
 else spawnWhite(x)
 
 return
@@ -171,11 +180,15 @@ return
 
 // ================= SPAWN TYPES =================
 function spawnRed(x){
-enemies.push({x,y:-40,width:40,height:40,speed:2+Math.random()*1.5})
+enemies.push({x,y:-40,width:40,height:40,speed:2+score*0.03})
 }
 
 function spawnBlue(x){
-blues.push({x,y:-30,width:30,height:30,vx:(Math.random()<0.5?-2:2),vy:3})
+blues.push({
+x,y:-30,width:30,height:30,
+vx:(Math.random()<0.5?-2:2)*(1+score*0.01),
+vy:3+score*0.02
+})
 }
 
 function spawnYellow(x){
@@ -183,22 +196,20 @@ yellows.push({x,y:0,width:30,height:30,state:"wait",time:Date.now()})
 }
 
 function spawnHunter(x){
-hunters.push({x,y:-30,width:30,height:30,last:0})
+hunters.push({x,y:-30,width:30,height:30,hp:3,last:0})
 }
 
 function spawnWhite(x){
-whites.push({x,y:-30,width:30,height:30,angle:0})
+whites.push({x,y:-30,width:30,height:30,hp:2,angle:0})
+}
+
+function spawnSniper(x){
+snipers.push({x,y:20,width:40,height:40,hp:10,lastShot:0})
 }
 
 // ================= POWER-UP =================
 function spawnPowerUp(){
-powerUps.push({
-x:Math.random()*260,
-y:-30,
-width:30,
-height:30,
-speed:2
-})
+powerUps.push({x:Math.random()*260,y:-30,width:30,height:30,speed:2})
 }
 
 // ================= BOMBA =================
@@ -213,6 +224,8 @@ blues=[]
 yellows=[]
 hunters=[]
 whites=[]
+snipers=[]
+enemyBullets=[]
 
 updateUI()
 }
@@ -220,7 +233,7 @@ updateUI()
 // ================= BOSS =================
 function startBoss(){
 isBoss=true
-enemies=[];blues=[];yellows=[];hunters=[];whites=[]
+enemies=[];blues=[];yellows=[];hunters=[];whites=[];snipers=[]
 
 boss={
 x:100,y:20,width:100,height:60,
@@ -236,25 +249,20 @@ function updateBoss(){
 const now=Date.now()
 
 if(bossState==="move"){
-boss.x+=boss.dir*(2+phase*0.3)
+boss.x+=boss.dir*(3+phase*0.5)
 
 if(boss.x<=0||boss.x+boss.width>=canvas.width){
 boss.dir*=-1
 }
 
-if(phase>=5 && now-bossTimer>4000){
-boss.x=Math.random()*200
-bossTimer=now
-}
-
-if(now-bossTimer>5000){
+if(now-bossTimer>3000){
 bossState="pause"
 bossTimer=now
 }
 }
 
 else if(bossState==="pause"){
-if(now-bossTimer>2000){
+if(now-bossTimer>1500){
 bossState="attack"
 bossTimer=now
 spawnBossEnemies()
@@ -262,7 +270,7 @@ spawnBossEnemies()
 }
 
 else if(bossState==="attack"){
-if(now-bossTimer>1500){
+if(now-bossTimer>1000){
 bossState="move"
 bossTimer=now
 }
@@ -305,13 +313,13 @@ shoot()
 lastShot=now
 }
 
-// bomba ganho
+// bombas
 if(score>=nextBombScore){
 bombs++
 nextBombScore+=10
 }
 
-// boss trigger
+// boss
 if(score>=phase*100 && !isBoss){
 startBoss()
 }
@@ -320,7 +328,7 @@ if(isBoss){
 updateBoss()
 }else{
 
-if(now-lastSpawn>1200){
+if(now-lastSpawn>1000){
 spawnSmartEnemy()
 lastSpawn=now
 }
@@ -341,13 +349,15 @@ bullets.forEach((b,i)=>{
 b.y-=b.speed
 if(b.y<0){bullets.splice(i,1);return}
 
+// boss
 if(isBoss && collide(b,boss)){
 boss.hp--
 bullets.splice(i,1)
 if(boss.hp<=0) killBoss()
 }
 
-;[enemies,blues,yellows,hunters,whites].forEach(arr=>{
+// colisões
+;[enemies,blues,yellows].forEach(arr=>{
 arr.forEach((e,ei)=>{
 if(collide(b,e)){
 bullets.splice(i,1)
@@ -356,9 +366,45 @@ score++
 }
 })
 })
+
+// roxo
+hunters.forEach((h,hi)=>{
+if(collide(b,h)){
+bullets.splice(i,1)
+h.hp--
+if(h.hp<=0){
+hunters.splice(hi,1)
+score++
+}
+}
 })
 
-// ================= ENEMIES =================
+// branco
+whites.forEach((w,wi)=>{
+if(collide(b,w)){
+bullets.splice(i,1)
+w.hp--
+if(w.hp<=0){
+whites.splice(wi,1)
+score++
+}
+}
+})
+
+// sniper
+snipers.forEach((s,si)=>{
+if(collide(b,s)){
+bullets.splice(i,1)
+s.hp--
+if(s.hp<=0){
+snipers.splice(si,1)
+score+=3
+}
+}
+})
+})
+
+// ================= ENEMY UPDATE =================
 enemies.forEach((e,i)=>{
 e.y+=e.speed
 if(e.y>canvas.height){score++;enemies.splice(i,1)}
@@ -377,7 +423,7 @@ yellows.forEach((y,i)=>{
 if(y.state==="wait"){
 if(Date.now()-y.time>1000) y.state="fall"
 }else{
-y.y+=6
+y.y+=6+score*0.03
 }
 if(y.y>canvas.height){score++;yellows.splice(i,1)}
 if(collide(player,y)){takeDamage();yellows.splice(i,1)}
@@ -389,7 +435,7 @@ h.targetX=player.x
 h.last=Date.now()
 }
 h.x+=(player.x-h.x)*0.05
-h.y+=2
+h.y+=2+score*0.02
 if(h.y>canvas.height){score++;hunters.splice(i,1)}
 if(collide(player,h)){takeDamage();hunters.splice(i,1)}
 })
@@ -397,9 +443,48 @@ if(collide(player,h)){takeDamage();hunters.splice(i,1)}
 whites.forEach((w,i)=>{
 w.angle+=0.1
 w.x+=Math.sin(w.angle)*2
-w.y+=2
+w.y+=2+score*0.02
 if(w.y>canvas.height){score++;whites.splice(i,1)}
 if(collide(player,w)){takeDamage();whites.splice(i,1)}
+})
+
+// sniper
+snipers.forEach((s,i)=>{
+
+if(Date.now()-s.lastShot>1500){
+
+let dx=player.x-s.x
+let dy=player.y-s.y
+let angle=Math.atan2(dy,dx)
+
+enemyBullets.push({
+x:s.x+20,y:s.y+20,
+vx:Math.cos(angle)*4,
+vy:Math.sin(angle)*4
+})
+
+s.lastShot=Date.now()
+}
+
+if(collide(player,s)){
+takeDamage()
+}
+})
+
+// tiros inimigos
+enemyBullets.forEach((b,i)=>{
+b.x+=b.vx
+b.y+=b.vy
+
+if(b.y>canvas.height||b.x<0||b.x>canvas.width){
+enemyBullets.splice(i,1)
+return
+}
+
+if(collide(player,b)){
+takeDamage()
+enemyBullets.splice(i,1)
+}
 })
 
 // ================= POWERUP =================
@@ -417,7 +502,7 @@ if(satellites<2) satellites++
 }
 })
 
-// vida extra
+// vida
 if(score>=nextLifeScore){
 lives++
 nextLifeScore+=100
@@ -435,7 +520,7 @@ ctx.clearRect(0,0,canvas.width,canvas.height)
 ctx.fillStyle="lime"
 ctx.fillRect(player.x,player.y,player.width,player.height)
 
-// drones
+// satélites
 ctx.fillStyle="cyan"
 if(satellites>=1) ctx.fillRect(player.x+45,player.y,20,20)
 if(satellites>=2) ctx.fillRect(player.x-25,player.y,20,20)
@@ -456,11 +541,17 @@ hunters.forEach(h=>ctx.fillRect(h.x,h.y,h.width,h.height))
 ctx.fillStyle="white"
 whites.forEach(w=>ctx.fillRect(w.x,w.y,w.width,w.height))
 
+ctx.fillStyle="brown"
+snipers.forEach(s=>ctx.fillRect(s.x,s.y,s.width,s.height))
+
 // tiros
 ctx.fillStyle="white"
 bullets.forEach(b=>ctx.fillRect(b.x,b.y,b.width,b.height))
 
-// powerups
+ctx.fillStyle="orange"
+enemyBullets.forEach(b=>ctx.fillRect(b.x,b.y,6,6))
+
+// powerup
 powerUps.forEach(p=>{
 ctx.fillStyle="gold"
 ctx.fillRect(p.x,p.y,p.width,p.height)
