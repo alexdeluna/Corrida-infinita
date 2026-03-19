@@ -79,3 +79,15 @@ border-radius:10px;
 font-size:18px;
 margin-top:10px;
 }
+
+if(collide(player,p)){
+powerUps.splice(i,1)
+
+if(satellites < 2){
+satellites++
+}
+
+// efeito visual simples
+ctx.fillStyle="cyan"
+ctx.fillRect(player.x, player.y, player.width, player.height)
+}
