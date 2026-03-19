@@ -11,8 +11,9 @@ const MIN_DISTANCE = 70
 
 // ================= STATE =================
 let player, bullets=[]
-let enemies=[], blues=[], yellows=[], hunters=[], fragments=[], whites=[]
+let enemies=[], blues=[], yellows=[], hunters=[], whites=[]
 let powerUps=[]
+
 let satellites=0
 
 let score=0, lives=3, bombs=0
@@ -20,6 +21,7 @@ let lastShot=0, lastSpawn=0
 
 let nextPowerUpScore=50
 let nextLifeScore=100
+let nextBombScore=10
 
 // boss
 let isBoss=false
@@ -33,12 +35,15 @@ let gameRunning=false
 // ================= UI =================
 const scoreText = document.getElementById("score")
 const livesText = document.getElementById("lives")
+const bombText = document.getElementById("bombCount")
 
 const startBtn = document.getElementById("start")
 const leftBtn = document.getElementById("left")
 const rightBtn = document.getElementById("right")
+const bombBtn = document.getElementById("bomb")
 
 startBtn.onclick=startGame
+bombBtn.onclick=useBomb
 
 // ================= START =================
 function startGame(){
@@ -46,12 +51,16 @@ function startGame(){
 player={x:130,y:450,width:40,height:40}
 
 bullets=[]
-enemies=[];blues=[];yellows=[];hunters=[];fragments=[];whites=[]
+enemies=[];blues=[];yellows=[];hunters=[];whites=[]
 powerUps=[]
 
 satellites=0
 
 score=0; lives=3; bombs=0
+nextPowerUpScore=50
+nextLifeScore=100
+nextBombScore=10
+
 phase=1; isBoss=false
 
 gameRunning=true
@@ -85,7 +94,7 @@ a.y<b.y+b.height && a.y+a.height>b.y
 }
 
 function totalEnemies(){
-return enemies.length+blues.length+yellows.length+hunters.length+fragments.length+whites.length
+return enemies.length+blues.length+yellows.length+hunters.length+whites.length
 }
 
 function isFar(x){
@@ -96,6 +105,8 @@ return [...enemies,...blues,...yellows,...hunters,...whites]
 function updateUI(){
 scoreText.innerText=score
 livesText.innerText=lives
+bombText.innerText=bombs
+bombBtn.disabled = bombs <= 0
 }
 
 // ================= DAMAGE =================
@@ -136,13 +147,11 @@ if(!isFar(x)){attempts++;continue}
 
 let r=Math.random()
 
-// early game
 if(score<20){
 spawnRed(x)
 return
 }
 
-// mid game
 if(score<50){
 if(r<0.5) spawnRed(x)
 else if(r<0.8) spawnBlue(x)
@@ -150,7 +159,6 @@ else spawnYellow(x)
 return
 }
 
-// late game
 if(r<0.25) spawnRed(x)
 else if(r<0.5) spawnBlue(x)
 else if(r<0.7) spawnYellow(x)
@@ -159,7 +167,6 @@ else spawnWhite(x)
 
 return
 }
-
 }
 
 // ================= SPAWN TYPES =================
@@ -176,22 +183,44 @@ yellows.push({x,y:0,width:30,height:30,state:"wait",time:Date.now()})
 }
 
 function spawnHunter(x){
-hunters.push({x,y:-30,width:30,height:30,hp:3,last:0})
+hunters.push({x,y:-30,width:30,height:30,last:0})
 }
 
 function spawnWhite(x){
-whites.push({x,y:-30,width:30,height:30,angle:0,hp:2})
+whites.push({x,y:-30,width:30,height:30,angle:0})
 }
 
 // ================= POWER-UP =================
 function spawnPowerUp(){
-powerUps.push({x:Math.random()*260,y:-30,size:30,speed:2})
+powerUps.push({
+x:Math.random()*260,
+y:-30,
+width:30,
+height:30,
+speed:2
+})
+}
+
+// ================= BOMBA =================
+function useBomb(){
+
+if(bombs<=0) return
+
+bombs--
+
+enemies=[]
+blues=[]
+yellows=[]
+hunters=[]
+whites=[]
+
+updateUI()
 }
 
 // ================= BOSS =================
 function startBoss(){
 isBoss=true
-enemies=[];blues=[];yellows=[];hunters=[];fragments=[];whites=[]
+enemies=[];blues=[];yellows=[];hunters=[];whites=[]
 
 boss={
 x:100,y:20,width:100,height:60,
@@ -276,6 +305,12 @@ shoot()
 lastShot=now
 }
 
+// bomba ganho
+if(score>=nextBombScore){
+bombs++
+nextBombScore+=10
+}
+
 // boss trigger
 if(score>=phase*100 && !isBoss){
 startBoss()
@@ -290,7 +325,6 @@ spawnSmartEnemy()
 lastSpawn=now
 }
 
-// fallback (anti-travamento)
 if(totalEnemies()===0){
 spawnRed(Math.random()*260)
 }
@@ -313,7 +347,6 @@ bullets.splice(i,1)
 if(boss.hp<=0) killBoss()
 }
 
-// colisão geral
 ;[enemies,blues,yellows,hunters,whites].forEach(arr=>{
 arr.forEach((e,ei)=>{
 if(collide(b,e)){
@@ -323,10 +356,9 @@ score++
 }
 })
 })
-
 })
 
-// ================= UPDATE ENEMIES =================
+// ================= ENEMIES =================
 enemies.forEach((e,i)=>{
 e.y+=e.speed
 if(e.y>canvas.height){score++;enemies.splice(i,1)}
@@ -336,9 +368,7 @@ if(collide(player,e)){takeDamage();enemies.splice(i,1)}
 blues.forEach((b,i)=>{
 b.x+=b.vx
 b.y+=b.vy
-
 if(b.x<=0||b.x+30>=canvas.width) b.vx*=-1
-
 if(b.y>canvas.height){score++;blues.splice(i,1)}
 if(collide(player,b)){takeDamage();blues.splice(i,1)}
 })
@@ -358,9 +388,8 @@ if(Date.now()-h.last>500){
 h.targetX=player.x
 h.last=Date.now()
 }
-h.x+=(h.targetX-h.x)*0.05
+h.x+=(player.x-h.x)*0.05
 h.y+=2
-
 if(h.y>canvas.height){score++;hunters.splice(i,1)}
 if(collide(player,h)){takeDamage();hunters.splice(i,1)}
 })
@@ -369,7 +398,6 @@ whites.forEach((w,i)=>{
 w.angle+=0.1
 w.x+=Math.sin(w.angle)*2
 w.y+=2
-
 if(w.y>canvas.height){score++;whites.splice(i,1)}
 if(collide(player,w)){takeDamage();whites.splice(i,1)}
 })
@@ -377,6 +405,12 @@ if(collide(player,w)){takeDamage();whites.splice(i,1)}
 // ================= POWERUP =================
 powerUps.forEach((p,i)=>{
 p.y+=p.speed
+
+if(p.y>canvas.height){
+powerUps.splice(i,1)
+return
+}
+
 if(collide(player,p)){
 powerUps.splice(i,1)
 if(satellites<2) satellites++
@@ -429,7 +463,7 @@ bullets.forEach(b=>ctx.fillRect(b.x,b.y,b.width,b.height))
 // powerups
 powerUps.forEach(p=>{
 ctx.fillStyle="gold"
-ctx.fillRect(p.x,p.y,p.size,p.size)
+ctx.fillRect(p.x,p.y,p.width,p.height)
 ctx.fillStyle="black"
 ctx.fillText("S",p.x+8,p.y+20)
 })
